@@ -557,6 +557,49 @@ async function syncLinksFromSheet(_payload, user) {
   return { success: true, updated };
 }
 
+// ── Admin: story status management ───────────────────────────────────────────
+
+const VALID_STORY_STATUSES = ['pending_payment', 'paid', 'story_generating', 'review', 'story_ready', 'failed'];
+
+async function updateStoryStatus({ story_id, status }, user) {
+  if (!VALID_STORY_STATUSES.includes(status)) {
+    throw Object.assign(new Error(`Invalid status: ${status}`), { status: 400 });
+  }
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  await supabase.from('stories').update({ payment_status: status }).eq('id', story_id);
+
+  // If marking as ready and story has a link + email, send notification
+  if (status === 'story_ready') {
+    const { data: story } = await supabase.from('stories').select('*').eq('id', story_id).single();
+    if (story?.story_link && story?.contact_email) {
+      sendStoryReadyEmail({ to: story.contact_email, childName: story.child_name, storyLink: story.story_link, isHebrew: isHebrewText(story.child_name) }).catch(() => {});
+    }
+  }
+
+  return { success: true, story_id, status };
+}
+
+async function retryStory({ story_id }, user) {
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  const { data: story } = await supabase.from('stories').select('*').eq('id', story_id).single();
+  if (!story) throw Object.assign(new Error('Story not found'), { status: 404 });
+  if (story.payment_status !== 'failed') {
+    throw Object.assign(new Error('Only failed stories can be retried'), { status: 400 });
+  }
+
+  // Reset to 'paid' (waiting) so it can be picked up for generation again
+  await supabase.from('stories').update({ payment_status: 'paid' }).eq('id', story_id);
+
+  // Also add back to Google Sheets for manual re-processing
+  addStoryToSheet({ data: story }).catch(() => {});
+
+  return { success: true, story_id, status: 'paid' };
+}
+
 // ── Function router ───────────────────────────────────────────────────────────
 const FUNCTIONS = {
   submitStoryWithCredits:  { handler: (p, u) => submitStoryWithCredits(p, u),  requiresAuth: true },
@@ -565,6 +608,8 @@ const FUNCTIONS = {
   createCreditsOrder:      { handler: (p, u) => createCreditsOrder(p, u),      requiresAuth: true },
   captureCreditsOrder:     { handler: (p, u) => captureCreditsOrder(p, u),     requiresAuth: true },
   validateCoupon:          { handler: (p, u) => validateCoupon(p, u),          requiresAuth: true },
+  updateStoryStatus:       { handler: (p, u) => updateStoryStatus(p, u),       requiresAuth: true },
+  retryStory:              { handler: (p, u) => retryStory(p, u),              requiresAuth: true },
   sendFormEmail:           { handler: (p) => sendFormEmail(p),                 requiresAuth: false },
   sendStoryReadyEmail:     { handler: (p) => sendStoryReadyEmail(p),           requiresAuth: false },
   notifyNewStory:          { handler: (p) => notifyNewStory(p),                requiresAuth: false },

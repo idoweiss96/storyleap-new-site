@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download, Shield, ShieldOff, Tag, Plus, Trash2 } from 'lucide-react';
+import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download, Shield, ShieldOff, Tag, Plus, Trash2, ClipboardList, RotateCcw, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLanguage } from '../components/LanguageContext';
 
@@ -38,6 +38,9 @@ export default function Admin() {
   const [newCoupon, setNewCoupon] = useState({ code: '', type: 'discount', price_ils: '15', price_usd: '5', credits_amount: '20', max_uses: '', max_uses_per_user: '1', expires_at: '' });
   const [isSavingCoupon, setIsSavingCoupon] = useState(false);
   const [couponMsg, setCouponMsg] = useState('');
+  const [ordersTab, setOrdersTab] = useState('all');
+  const [updatingStatus, setUpdatingStatus] = useState(null);
+  const [retryingStory, setRetryingStory] = useState(null);
 
   const settingLabels = { space: t('setting_space'), forest: t('setting_forest'), castle: t('setting_castle'), sports: t('setting_sports'), real_life: t('setting_real_life') };
   const challengeLabels = { fears: t('ch_fears'), social_difficulty: t('ch_social'), changes: t('ch_changes'), emotional_regulation: t('ch_emotional'), separation_anxiety: t('ch_separation'), self_confidence: t('ch_confidence'), sleep_issues: t('ch_sleep') };
@@ -162,6 +165,45 @@ export default function Admin() {
     finally { setIsSaving(false); }
   };
 
+  const STATUS_META = {
+    pending_payment: { label: 'Draft',      color: 'bg-gray-100 text-gray-600' },
+    paid:            { label: 'Waiting',    color: 'bg-blue-100 text-blue-700' },
+    story_generating:{ label: 'Generating', color: 'bg-yellow-100 text-yellow-700' },
+    review:          { label: 'Review',     color: 'bg-violet-100 text-violet-700' },
+    story_ready:     { label: 'Ready',      color: 'bg-green-100 text-green-700' },
+    failed:          { label: 'Failed',     color: 'bg-red-100 text-red-700' },
+  };
+  const STATUS_FLOW = ['pending_payment', 'paid', 'story_generating', 'review', 'story_ready', 'failed'];
+  const ORDERS_TABS = [
+    { key: 'all',              label: 'הכל' },
+    { key: 'paid',             label: 'Waiting' },
+    { key: 'story_generating', label: 'Generating' },
+    { key: 'review',           label: 'Review' },
+    { key: 'story_ready',      label: 'Ready' },
+    { key: 'failed',           label: 'Failed' },
+  ];
+
+  const paidStories = stories.filter(s => s.payment_status !== 'pending_payment');
+  const filteredOrders = ordersTab === 'all' ? paidStories : paidStories.filter(s => s.payment_status === ordersTab);
+
+  const handleUpdateStatus = async (story, newStatus) => {
+    setUpdatingStatus(story.id);
+    try {
+      await invokeFunction('updateStoryStatus', { story_id: story.id, status: newStatus });
+      setStories(stories.map(s => s.id === story.id ? { ...s, payment_status: newStatus } : s));
+    } catch (err) { alert('שגיאה: ' + err.message); }
+    finally { setUpdatingStatus(null); }
+  };
+
+  const handleRetry = async (story) => {
+    setRetryingStory(story.id);
+    try {
+      await invokeFunction('retryStory', { story_id: story.id });
+      setStories(stories.map(s => s.id === story.id ? { ...s, payment_status: 'paid' } : s));
+    } catch (err) { alert('שגיאה: ' + err.message); }
+    finally { setRetryingStory(null); }
+  };
+
   const handleCreateCoupon = async () => {
     if (!newCoupon.code.trim()) { setCouponMsg('חסר קוד קופון'); return; }
     setIsSavingCoupon(true); setCouponMsg('');
@@ -250,6 +292,111 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Orders Management Panel */}
+      <Card className="border-0 shadow-xl shadow-slate-100 mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ClipboardList className="w-5 h-5" /> ניהול הזמנות
+            <span className="ml-auto text-sm font-normal text-slate-500">{paidStories.length} הזמנות בסה"כ</span>
+          </CardTitle>
+          {/* Status tabs */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {ORDERS_TABS.map(tab => {
+              const count = tab.key === 'all' ? paidStories.length : paidStories.filter(s => s.payment_status === tab.key).length;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setOrdersTab(tab.key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${ordersTab === tab.key ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {tab.label}
+                  <span className={`text-xs rounded-full px-1.5 py-0.5 ${ordersTab === tab.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredOrders.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">אין הזמנות בסטטוס זה</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">תאריך</TableHead>
+                    <TableHead className="text-right">שם ילד/ה</TableHead>
+                    <TableHead className="text-right">אימייל</TableHead>
+                    <TableHead className="text-right">סטטוס</TableHead>
+                    <TableHead className="text-right">לינק סיפור</TableHead>
+                    <TableHead className="text-right">פעולות</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map(story => {
+                    const meta = STATUS_META[story.payment_status] || STATUS_META['pending_payment'];
+                    const isUpdating = updatingStatus === story.id;
+                    const isRetrying = retryingStory === story.id;
+                    return (
+                      <TableRow key={story.id}>
+                        <TableCell className="text-sm text-slate-500 whitespace-nowrap">
+                          {story.created_at ? format(new Date(story.created_at), 'dd/MM/yy HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell className="font-medium">{story.child_name}</TableCell>
+                        <TableCell className="text-sm text-slate-500">{story.contact_email || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={meta.color}>{meta.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {story.story_link
+                            ? <a href={story.story_link} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />פתח</a>
+                            : <span className="text-slate-300">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {/* Status transition buttons */}
+                            {story.payment_status === 'paid' && (
+                              <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'story_generating')} className="text-xs h-7 border-yellow-300 text-yellow-700 hover:bg-yellow-50">
+                                {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : '→ Generating'}
+                              </Button>
+                            )}
+                            {story.payment_status === 'story_generating' && (
+                              <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'review')} className="text-xs h-7 border-violet-300 text-violet-700 hover:bg-violet-50">
+                                {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : '→ Review'}
+                              </Button>
+                            )}
+                            {story.payment_status === 'review' && (
+                              <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'story_ready')} className="text-xs h-7 border-green-300 text-green-700 hover:bg-green-50">
+                                {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : '→ Ready ✓'}
+                              </Button>
+                            )}
+                            {story.payment_status === 'failed' && (
+                              <Button size="sm" variant="outline" disabled={isRetrying} onClick={() => handleRetry(story)} className="text-xs h-7 border-blue-300 text-blue-700 hover:bg-blue-50">
+                                {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <><RotateCcw className="w-3 h-3 ml-1" />Retry</>}
+                              </Button>
+                            )}
+                            {/* Mark as failed */}
+                            {['paid', 'story_generating', 'review'].includes(story.payment_status) && (
+                              <Button size="sm" variant="ghost" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'failed')} className="text-xs h-7 text-red-400 hover:text-red-600 hover:bg-red-50">
+                                Failed
+                              </Button>
+                            )}
+                            {/* Edit link */}
+                            <Button variant="ghost" size="sm" onClick={() => { setEditingStory(story); setStoryLink(story.story_link || ''); }} className="h-7 w-7 p-0">
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="border-0 shadow-xl shadow-slate-100 mb-8">
         <CardHeader>
