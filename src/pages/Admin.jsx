@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download, Shield, ShieldOff } from 'lucide-react';
+import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download, Shield, ShieldOff, Tag, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLanguage } from '../components/LanguageContext';
 
@@ -34,6 +34,10 @@ export default function Admin() {
   const [searchUsers, setSearchUsers] = useState('');
   const [viewingImage, setViewingImage] = useState(null);
   const [togglingRole, setTogglingRole] = useState(null);
+  const [coupons, setCoupons] = useState([]);
+  const [newCoupon, setNewCoupon] = useState({ code: '', type: 'discount', price_ils: '15', price_usd: '5', credits_amount: '20', max_uses: '', max_uses_per_user: '1', expires_at: '' });
+  const [isSavingCoupon, setIsSavingCoupon] = useState(false);
+  const [couponMsg, setCouponMsg] = useState('');
 
   const settingLabels = { space: t('setting_space'), forest: t('setting_forest'), castle: t('setting_castle'), sports: t('setting_sports'), real_life: t('setting_real_life') };
   const challengeLabels = { fears: t('ch_fears'), social_difficulty: t('ch_social'), changes: t('ch_changes'), emotional_regulation: t('ch_emotional'), separation_anxiety: t('ch_separation'), self_confidence: t('ch_confidence'), sleep_issues: t('ch_sleep') };
@@ -49,12 +53,14 @@ export default function Admin() {
       const { data: userRow } = await supabase.from('users').select('*').eq('id', authUser.id).single();
       if (userRow?.role === 'admin') {
         setIsAdmin(true);
-        const [{ data: allStories }, { data: allUsers }] = await Promise.all([
+        const [{ data: allStories }, { data: allUsers }, { data: allCoupons }] = await Promise.all([
           supabase.from('stories').select('*').order('created_at', { ascending: false }),
           supabase.from('users').select('*').order('created_at', { ascending: false }),
+          supabase.from('coupons').select('*').order('created_at', { ascending: false }),
         ]);
         setStories(allStories || []);
         setUsers(allUsers || []);
+        setCoupons(allCoupons || []);
       }
     } catch (_) {}
     finally { setIsLoading(false); }
@@ -154,6 +160,41 @@ export default function Admin() {
       setEditingStory(null); setStoryLink('');
     } catch (_) {}
     finally { setIsSaving(false); }
+  };
+
+  const handleCreateCoupon = async () => {
+    if (!newCoupon.code.trim()) { setCouponMsg('חסר קוד קופון'); return; }
+    setIsSavingCoupon(true); setCouponMsg('');
+    try {
+      const payload = {
+        code: newCoupon.code.trim().toUpperCase(),
+        type: newCoupon.type,
+        active: true,
+        max_uses: newCoupon.max_uses ? parseInt(newCoupon.max_uses) : null,
+        max_uses_per_user: newCoupon.max_uses_per_user ? parseInt(newCoupon.max_uses_per_user) : null,
+        expires_at: newCoupon.expires_at || null,
+      };
+      if (newCoupon.type === 'discount') { payload.price_ils = parseFloat(newCoupon.price_ils); payload.price_usd = parseFloat(newCoupon.price_usd); }
+      if (newCoupon.type === 'free_credits') { payload.credits_amount = parseInt(newCoupon.credits_amount); }
+      const { error } = await supabase.from('coupons').insert(payload);
+      if (error) { setCouponMsg('שגיאה: ' + error.message); return; }
+      const { data } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+      setCoupons(data || []);
+      setNewCoupon({ code: '', type: 'discount', price_ils: '15', price_usd: '5', credits_amount: '20', max_uses: '', max_uses_per_user: '1', expires_at: '' });
+      setCouponMsg('✓ קופון נוצר בהצלחה');
+    } catch (err) { setCouponMsg('שגיאה: ' + err.message); }
+    finally { setIsSavingCoupon(false); }
+  };
+
+  const handleToggleCoupon = async (coupon) => {
+    await supabase.from('coupons').update({ active: !coupon.active }).eq('code', coupon.code);
+    setCoupons(coupons.map(c => c.code === coupon.code ? { ...c, active: !c.active } : c));
+  };
+
+  const handleDeleteCoupon = async (code) => {
+    if (!confirm(`למחוק קופון ${code}?`)) return;
+    await supabase.from('coupons').delete().eq('code', code);
+    setCoupons(coupons.filter(c => c.code !== code));
   };
 
   const downloadImage = (url, name) => {
@@ -317,6 +358,91 @@ export default function Admin() {
               </TableBody>
             </Table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Coupons Management */}
+      <Card className="border-0 shadow-xl shadow-slate-100 mt-8">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><Tag className="w-5 h-5" /> ניהול קופונים</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Create new coupon */}
+          <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-slate-700">יצירת קופון חדש</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs">קוד</Label>
+                <Input value={newCoupon.code} onChange={e => setNewCoupon(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="SUMMER25" className="mt-1 uppercase" dir="ltr" />
+              </div>
+              <div>
+                <Label className="text-xs">סוג</Label>
+                <select value={newCoupon.type} onChange={e => setNewCoupon(p => ({ ...p, type: e.target.value }))} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="discount">הנחה (discount)</option>
+                  <option value="free_credits">קרדיטים חינם</option>
+                </select>
+              </div>
+              {newCoupon.type === 'discount' && <>
+                <div><Label className="text-xs">מחיר ILS ₪</Label><Input type="number" value={newCoupon.price_ils} onChange={e => setNewCoupon(p => ({ ...p, price_ils: e.target.value }))} className="mt-1" dir="ltr" /></div>
+                <div><Label className="text-xs">מחיר USD $</Label><Input type="number" value={newCoupon.price_usd} onChange={e => setNewCoupon(p => ({ ...p, price_usd: e.target.value }))} className="mt-1" dir="ltr" /></div>
+              </>}
+              {newCoupon.type === 'free_credits' && (
+                <div><Label className="text-xs">מספר קרדיטים</Label><Input type="number" value={newCoupon.credits_amount} onChange={e => setNewCoupon(p => ({ ...p, credits_amount: e.target.value }))} className="mt-1" dir="ltr" /></div>
+              )}
+              <div><Label className="text-xs">מקסימום שימושים (ריק = ללא הגבלה)</Label><Input type="number" value={newCoupon.max_uses} onChange={e => setNewCoupon(p => ({ ...p, max_uses: e.target.value }))} placeholder="ללא הגבלה" className="mt-1" dir="ltr" /></div>
+              <div><Label className="text-xs">מקסימום למשתמש</Label><Input type="number" value={newCoupon.max_uses_per_user} onChange={e => setNewCoupon(p => ({ ...p, max_uses_per_user: e.target.value }))} className="mt-1" dir="ltr" /></div>
+              <div><Label className="text-xs">תאריך תפוגה (אופציונלי)</Label><Input type="date" value={newCoupon.expires_at} onChange={e => setNewCoupon(p => ({ ...p, expires_at: e.target.value }))} className="mt-1" dir="ltr" /></div>
+            </div>
+            <Button onClick={handleCreateCoupon} disabled={isSavingCoupon} className="bg-violet-600 hover:bg-violet-700 text-white">
+              {isSavingCoupon ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />}צור קופון
+            </Button>
+            {couponMsg && <p className={`text-sm ${couponMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{couponMsg}</p>}
+          </div>
+
+          {/* Coupons list */}
+          {coupons.length > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">קוד</TableHead>
+                    <TableHead className="text-right">סוג</TableHead>
+                    <TableHead className="text-right">פרטים</TableHead>
+                    <TableHead className="text-right">הגבלות</TableHead>
+                    <TableHead className="text-right">תפוגה</TableHead>
+                    <TableHead className="text-right">סטטוס</TableHead>
+                    <TableHead className="text-right">פעולות</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coupons.map(c => (
+                    <TableRow key={c.code}>
+                      <TableCell className="font-mono font-bold text-slate-800">{c.code}</TableCell>
+                      <TableCell>{c.type === 'discount' ? 'הנחה' : c.type === 'free_credits' ? 'קרדיטים חינם' : 'Hosted Button'}</TableCell>
+                      <TableCell className="text-sm text-slate-600">
+                        {c.type === 'discount' && `₪${c.price_ils} / $${c.price_usd}`}
+                        {c.type === 'free_credits' && `${c.credits_amount} ⭐`}
+                        {c.type === 'hosted_button' && c.hosted_display}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-500">
+                        {c.max_uses ? `עד ${c.max_uses} שימושים` : 'ללא הגבלה'} / {c.max_uses_per_user ? `${c.max_uses_per_user} למשתמש` : 'ללא הגבלה'}
+                      </TableCell>
+                      <TableCell className="text-sm">{c.expires_at ? format(new Date(c.expires_at), 'dd/MM/yyyy') : '—'}</TableCell>
+                      <TableCell>
+                        <Badge className={c.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}>{c.active ? 'פעיל' : 'כבוי'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleToggleCoupon(c)}>{c.active ? 'כבה' : 'הפעל'}</Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCoupon(c.code)} className="text-red-500 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 

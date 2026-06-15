@@ -287,7 +287,67 @@ async function createCreditsOrder({ currency = 'ILS', amount = '45.00', return_u
   return { paypal_order_id: ppData.id, client_id: process.env.PAYPAL_CLIENT_ID };
 }
 
-async function captureCreditsOrder({ paypal_order_id, credits = 20, coupon }, user) {
+async function validateCoupon({ code }, user) {
+  if (!code) throw Object.assign(new Error('Missing coupon code'), { status: 400 });
+  const normalizedCode = code.trim().toUpperCase();
+
+  const { data: coupon, error } = await supabase
+    .from('coupons')
+    .select('*')
+    .eq('code', normalizedCode)
+    .single();
+
+  if (error || !coupon) throw Object.assign(new Error('Invalid coupon code'), { status: 400 });
+  if (!coupon.active) throw Object.assign(new Error('Coupon is no longer active'), { status: 400 });
+  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+    throw Object.assign(new Error('Coupon has expired'), { status: 400 });
+  }
+
+  // Check total usage limit
+  if (coupon.max_uses !== null) {
+    const { count } = await supabase
+      .from('coupon_redemptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('coupon_code', normalizedCode);
+    if (count >= coupon.max_uses) throw Object.assign(new Error('Coupon usage limit reached'), { status: 400 });
+  }
+
+  // Check per-user usage limit
+  if (coupon.max_uses_per_user !== null) {
+    const { count } = await supabase
+      .from('coupon_redemptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('coupon_code', normalizedCode)
+      .eq('user_email', user.email);
+    if (count >= coupon.max_uses_per_user) {
+      throw Object.assign(new Error('You have already used this coupon'), { status: 400 });
+    }
+  }
+
+  return { valid: true, coupon };
+}
+
+async function captureCreditsOrder({ paypal_order_id, credits = 20, coupon, coupon_code }, user) {
+  // If this is a free-credit coupon redemption, validate it server-side
+  if (coupon && coupon_code) {
+    const normalizedCode = coupon_code.trim().toUpperCase();
+    // Re-validate to prevent replay attacks
+    await validateCoupon({ code: normalizedCode }, user);
+
+    const { data: users } = await supabase.from('users').select('*').eq('email', user.email);
+    const currentUser = users?.[0];
+    if (!currentUser) throw new Error('User not found');
+
+    const newCredits = (currentUser.credits || 0) + credits;
+    await supabase.from('users').update({ credits: newCredits }).eq('id', currentUser.id);
+
+    // Record redemption
+    await supabase.from('coupon_redemptions').insert({ coupon_code: normalizedCode, user_email: user.email });
+
+    return { success: true, credits_added: credits, new_total: newCredits };
+  }
+
+  // Standard PayPal payment flow (coupon=true means hosted button, no code needed)
   if (!coupon) {
     const accessToken = await getPaypalAccessToken();
     const orderCheckRes = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${paypal_order_id}`, {
@@ -504,6 +564,7 @@ const FUNCTIONS = {
   capturePaypalOrder:      { handler: (p, u) => capturePaypalOrder(p, u),      requiresAuth: true },
   createCreditsOrder:      { handler: (p, u) => createCreditsOrder(p, u),      requiresAuth: true },
   captureCreditsOrder:     { handler: (p, u) => captureCreditsOrder(p, u),     requiresAuth: true },
+  validateCoupon:          { handler: (p, u) => validateCoupon(p, u),          requiresAuth: true },
   sendFormEmail:           { handler: (p) => sendFormEmail(p),                 requiresAuth: false },
   sendStoryReadyEmail:     { handler: (p) => sendStoryReadyEmail(p),           requiresAuth: false },
   notifyNewStory:          { handler: (p) => notifyNewStory(p),                requiresAuth: false },
