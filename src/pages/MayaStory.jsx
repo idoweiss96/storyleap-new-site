@@ -4,33 +4,33 @@ import { ChevronLeft, ChevronRight, RotateCcw, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../components/LanguageContext';
 
-const COVER_IMAGE = 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/203904ade_image.png';
+const COVER_IMAGE = 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/cover.png';
 
 const PAGES_EN = [
   { type: 'cover' },
   {
     type: 'story', pageNum: 1,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/f638f6573_image11.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image11.png',
     text: "Inside a beautiful palace lived Princess Maya. She had a wonderful room, full of colors, glitter, and everything needed for art. Maya loved to draw, cut, and paste very much. Her best friend, the fairy doll Tinkerbell, always sat beside her and watched the magic. In this room, everything was familiar and pleasant, and Maya's heart was full of peace."
   },
   {
     type: 'story', pageNum: 2,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/28647736e_image22.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image22.png',
     text: "One day, a gray and confused cloud arrived at the palace. It was 'The Cloud of Confusion'. It quietly entered and wrapped all of Maya's things in a fog. Suddenly, the familiar room disappeared, and she found herself in a new and unfamiliar room in a different palace. Nothing looked the same. Maya felt very small and lost. She wanted to be held like a baby and couldn't find her words."
   },
   {
     type: 'story', pageNum: 3,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/06c9aabb1_image33.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image33.png',
     text: "The King and Queen, Maya's father and mother, entered the room and found her with big, sad eyes. Mom bent down and hugged her tightly. 'Oh, our dear Maya,' she said softly. 'We see that the Cloud of Confusion has arrived. It's completely okay to feel a little lost when everything is new and different. It's not your fault.' Dad stroked her hair. 'All your feelings are allowed. We are here for you.'"
   },
   {
     type: 'story', pageNum: 4,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/956c78c53_image44.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image44.png',
     text: "'I have an idea,' said Dad. 'We have the power to add color and joy to this new place. You are the best artist in the whole kingdom!' Mom brought large sheets of paper and all the boxes of colors. 'Let's re-draw this room, just the way you want it to be!' she suggested. Maya, with the help of Tinkerbell who whispered magical ideas to her, began to draw. She drew flowers on the walls, stars on the ceiling, and a glittery path leading to the bed."
   },
   {
     type: 'story', pageNum: 5,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/18b3cc357_image55.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image55.png',
     text: "Slowly, the new room filled with Maya's colors and imagination. The Cloud of Confusion, which was watching from the side, began to shrink. The more Maya added of herself to the room, the smaller and more transparent the cloud became, until finally, it just evaporated and disappeared. Maya looked around. It was a new room, but now it was her room. She smiled a big smile. She knew that even in a new place, she had the power to create a home for herself."
   },
   { type: 'end' }
@@ -40,27 +40,27 @@ const PAGES_HE = [
   { type: 'cover' },
   {
     type: 'story', pageNum: 1,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/f638f6573_image11.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image11.png',
     text: "בארץ רחוקה, בתוך ארמון יפה, חיה לה נסיכה קטנה ומתוקה בשם מאיה.\n\nהדבר שמאיה אהבה הכי בעולם היה לצייר וליצור. היא הייתה יכולה לשבת שעות עם צבעים ודפים וליצור דברים אמיצים וממלכות קסומות. לידה תמיד ישבה טינקרבל, בת הפיה האהובה שלה, שהייתה החברה הכי טובה שלה. בחדר הישן שלה, הכול היה נעים ומוכר."
   },
   {
     type: 'story', pageNum: 2,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/28647736e_image22.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image22.png',
     text: "יום אחד, המלך והמלכה הודיעו: \"עוברים לארמון חדש!\"\n\nמאיה התרגשה, אבל כשהגיעו, הכול היה שונה. החדר החדש היה גדול וזר. פתאום, מאין צץ ענן אפור וקודר, \"ענן הבלבול\". הוא ריחף מעל לראשה ולחש לחישות מבלבלות.\n\n\"זה לא הבית שלך,\" הוא מלמל. מאיה הרגישה פתאום צרב חזק שחיזקו אותה, כמו כששיניה תינוקות. היא נצמדה לאמא ולא רצתה לעזוב."
   },
   {
     type: 'story', pageNum: 3,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/06c9aabb1_image33.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image33.png',
     text: "אמא, המלכה, התכופפה וחיבקה את מאיה חזק. היא לא אמרה, \"אל תהיי עצובה\". במקום זה, היא הצביעה בעדינות למעלה ואמרה:\n\n\"אני רואה שענן הבלבול בא לבקר. הוא יכול להיות ממש עקשן ולגרום לדברים מבלבלים, נכון?\n\nגם לי יש כזה לפעמים, כשדברים חדשים. מאיה הנהנה בראשה. היא הרגישה הקלה. אמא מבינה! היא לא כועסת. היא יודעת בדיוק מה מאיה מרגישה."
   },
   {
     type: 'story', pageNum: 4,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/956c78c53_image44.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image44.png',
     text: "\"יש לי רעיון!\" אמרה המלכה. \"אולי נצא למשימת אבירים ונכבש את הממלכה החדשה שלנו?\"\n\nהיא הביאה דף ענק וצבעי קסם. \"בואי נצייר מפה של החדר החדש שלך!\"\n\nהן התחילו לצייר. מאיה ציירה את המיטה שלה וקראה לה \"מבצר החלומות\". הפינה עם הצעצועים הפכה ל\"יער הקסם של טינקרבל\". ככל שהן ציירו יותר, ענן הבלבול הלך ונעשה קטן יותר ושקט יותר."
   },
   {
     type: 'story', pageNum: 5,
-    image: 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/18b3cc357_image55.png',
+    image: 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/maya/image55.png',
     text: "כשהמפה הייתה מוכנה, מאיה והוריה תלו אותה על הקיר. החדר כבר לא היה זר. הוא היה עכשיו \"ממלכת מאיה\", עם מבצר חלומות ויער קסם. ענן הבלבול היה עכשיו קטנטן, כמו צמר גפן, והוא נח בשקט בפינה.\n\nמאיה חייכה. היא הבינה שגם בארמון חדש, עם קצת עזרה מההורים והרבה יצירה, היא הנסיכה האמיצה שיודעת לכבוש כל מקום ולהפוך אותו לבית. 💛"
   },
   { type: 'end' }

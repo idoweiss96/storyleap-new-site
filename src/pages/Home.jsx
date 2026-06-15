@@ -165,7 +165,7 @@ export default function Home() {
                      </Button>
                   </Link>
                 </div>
-                <img src="https://media.base44.com/images/public/697f4b704975c71e9cf56f59/7455564e3_MAYA.png"
+                <img src="https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/MAYA.png"
                 alt="Princess Maya"
                 className="w-36 md:w-44 object-contain drop-shadow-lg rounded-md" />
               </div>
@@ -182,14 +182,14 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/ee44ec4b5_image4.png',
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/aacd843f4_image52.png',
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/dd316698e_image51.png',
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/0e345ce30_image5.png',
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/e38dd71a8_image54.png',
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/ad2824198_image53.png',
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/83af1df79_image1.png',
-          'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/697f4b704975c71e9cf56f59/465dd64af_image3.png'].
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image4.png',
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image52.png',
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image51.png',
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image5.png',
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image54.png',
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image53.png',
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image1.png',
+          'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/gallery/image3.png'].
           map((src, i) =>
           <motion.div key={i} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.07 }}
           className="aspect-square overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 cursor-pointer">

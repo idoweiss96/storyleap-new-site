@@ -40,14 +40,14 @@ server/
 - כיוון: RTL (עברית) / LTR (אנגלית) — נשלט דרך LanguageContext
 - צבעי ברירת מחדל: slate-800 (כהה), amber (זהב), violet (סגול)
 - UI Library: shadcn/ui (רכיבים בתיקיית src/components/ui/)
-- תמונות רקע ולוגו: URLs מ-`media.base44.com` — אלו רק קישורי CDN לתמונות, לא קוד Base44
+- תמונות רקע, לוגו, גלריה וסיפור מאיה: מאוחסנות ב-Supabase Storage שלנו (bucket ציבורי `site-assets`)
 
 ## חשוב — אין Base44 בפרויקט הזה
 הפרויקט **הועתק** מ-Base44 ל-Supabase + Express.js.
 - אין `@base44/sdk` — נמחק לחלוטין
 - אין `base44Client.js` — נמחק
 - אין API של Base44 — הכל עובר דרך `/api/functions/...` ל-Express
-- URLs של `media.base44.com` שמופיעים בקוד הם **רק תמונות סטטיות** (CDN) — לא קוד או SDK
+- אין יותר תלות ב-`media.base44.com` או ב-Supabase של Base44 — כל התמונות הועברו ל-`site-assets`
 - Auth: Supabase (לא Base44)
 - DB: Supabase PostgreSQL (לא Base44)
 - Backend: Express.js ב-`server/index.js` (לא Base44)

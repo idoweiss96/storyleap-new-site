@@ -67,7 +67,7 @@ export default function CreateStory() {
 
   const buildStoryData = (paymentStatus) => ({
     child_name: formData.childName, child_age: parseInt(formData.childAge), gender: formData.gender,
-    child_image_url: formData.childImage || null, setting: formData.setting,
+    child_image: formData.childImage || null, setting: formData.setting,
     challenge_type: formData.challengeType, trigger_desc: formData.triggerDesc || null,
     reaction_type: formData.reactionType || null, hobbies: formData.hobbies || null,
     contact_email: formData.contactEmail || null, contact_phone: formData.contactPhone || null,

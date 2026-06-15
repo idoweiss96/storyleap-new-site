@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Sparkles, Mail, Loader2, CheckCircle } from 'lucide-react';
 
-const LOGO_URL = 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/e41c4f352_Storyleap.svg';
+const LOGO_URL = 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/Storyleap.svg';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -69,7 +69,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4"
-      style={{ backgroundImage: 'url(https://media.base44.com/images/public/697f4b704975c71e9cf56f59/e62ec3a0d_generated_image.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      style={{ backgroundImage: 'url(https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/background.png)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
         <div className="text-center mb-6">
           <img src={LOGO_URL} alt="StoryLeap" className="h-12 mx-auto mb-2" />

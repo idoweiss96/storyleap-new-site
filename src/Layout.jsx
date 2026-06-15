@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import OnboardingTour from './components/onboarding/OnboardingTour';
 import { LanguageProvider, useLanguage } from './components/LanguageContext';
 
-const LOGO_URL = 'https://media.base44.com/images/public/697f4b704975c71e9cf56f59/e41c4f352_Storyleap.svg';
+const LOGO_URL = 'https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/Storyleap.svg';
 
 function LayoutInner({ children, currentPageName }) {
   const { t, lang, toggleLang, isRTL } = useLanguage();
@@ -76,7 +76,7 @@ function LayoutInner({ children, currentPageName }) {
   const navItems = user ? authNavItems : publicNavItems;
 
   return (
-    <div dir={isRTL ? 'rtl' : 'ltr'} className="min-h-screen" style={{backgroundImage: 'url(https://media.base44.com/images/public/697f4b704975c71e9cf56f59/e62ec3a0d_generated_image.png)', backgroundSize: 'cover', backgroundPosition: 'center top', backgroundAttachment: 'scroll', backgroundRepeat: 'no-repeat'}}>
+    <div dir={isRTL ? 'rtl' : 'ltr'} className="min-h-screen" style={{backgroundImage: 'url(https://xhczjpgnlcqaofqplnxg.supabase.co/storage/v1/object/public/site-assets/background.png)', backgroundSize: 'cover', backgroundPosition: 'center top', backgroundAttachment: 'scroll', backgroundRepeat: 'no-repeat'}}>
       <style>{`
         @keyframes twinkle {
           0%, 100% { opacity: 0.2; transform: scale(0.7); }

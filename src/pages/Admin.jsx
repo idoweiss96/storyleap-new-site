@@ -242,9 +242,9 @@ export default function Admin() {
                       <TableCell className="font-medium">{story.child_name}</TableCell>
                       <TableCell>{story.child_age}</TableCell>
                       <TableCell>
-                        {story.child_image_url ? (
-                          <button onClick={() => setViewingImage({ url: story.child_image_url, name: story.child_name })} className="hover:opacity-80 transition-opacity">
-                            <img src={story.child_image_url} alt={story.child_name} className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+                        {story.child_image ? (
+                          <button onClick={() => setViewingImage({ url: story.child_image, name: story.child_name })} className="hover:opacity-80 transition-opacity">
+                            <img src={story.child_image} alt={story.child_name} className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
                           </button>
                         ) : (
                           <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center"><Image className="w-4 h-4 text-gray-300" /></div>
