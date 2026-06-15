@@ -34,6 +34,7 @@ async function convertHeicToJpeg(file) {
 export default function StoryForm({ formData, setFormData, onSubmit, isLoading }) {
   const { t, lang } = useLanguage();
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   const genders = [
     { value: 'boy', label: t('gender_boy') },
@@ -71,6 +72,7 @@ export default function StoryForm({ formData, setFormData, onSubmit, isLoading }
     let file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadError('');
     try {
       if (/\.(heic|heif)$/i.test(file.name) || file.type === 'image/heic' || file.type === 'image/heif') {
         file = await convertHeicToJpeg(file);
@@ -78,13 +80,13 @@ export default function StoryForm({ formData, setFormData, onSubmit, isLoading }
       const { file_url } = await uploadFile(file);
       handleChange('childImage', file_url);
     } catch (err) {
-      console.error('Upload error:', err);
+      setUploadError(lang === 'he' ? 'שגיאה בהעלאת התמונה. נסו שוב.' : 'Upload failed. Please try again.');
     } finally {
       setUploading(false);
     }
   };
 
-  const removeImage = () => handleChange('childImage', '');
+  const removeImage = () => { handleChange('childImage', ''); setUploadError(''); };
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
@@ -130,6 +132,7 @@ export default function StoryForm({ formData, setFormData, onSubmit, isLoading }
               )}
             </label>
           )}
+          {uploadError && <p className="text-xs text-red-500 font-medium">{uploadError}</p>}
           <p className="text-xs text-slate-500 max-w-xs leading-relaxed">
             {lang === 'he' ? 'העלו תמונה של הילד/ה כדי שהסיפור יהיה אישי ומיוחד 📸 התמונה נמחקת מיד עם סיום יצירת הסיפור.' : "Upload a photo to make the story personal and unique 📸 The photo is deleted as soon as the story is created."}
           </p>

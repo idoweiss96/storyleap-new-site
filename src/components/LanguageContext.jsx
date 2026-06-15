@@ -72,6 +72,11 @@ const translations = {
     contact_success_title: 'תודה! ההודעה נשלחה 🎉', contact_success_msg: 'קיבלנו את הפנייה שלכם ונחזור אליכם בהקדם.',
     contact_error_required: 'אנא מלאו את כל השדות הנדרשים', contact_error_send: 'אירעה שגיאה. נסו שוב.',
     contact_info_email: 'מייל', contact_info_phone: 'טלפון',
+    onb_welcome_title: '!ברוכים הבאים ל-StoryLeap 🎉', onb_welcome_desc: 'שמחים שהצטרפתם! בואו נראה לכם את המערכת בכמה צעדים פשוטים.',
+    onb_create_title: 'יצירת סיפור ✨', onb_create_desc: 'לחצו על "סיפור חדש" כדי ליצור סיפור מותאם אישית לילד/ה שלכם. מלאו את הפרטים והקסם יעשה את השאר!',
+    onb_stories_title: 'הסיפורים שלי 📚', onb_stories_desc: 'כל הסיפורים שיצרתם שמורים כאן. תוכלו לקרוא, להדפיס או להוריד אותם בכל עת.',
+    onb_finish_title: '!הכל מוכן 🚀', onb_finish_desc: 'זהו! עכשיו אתם יודעים הכל. בואו ניצור את הסיפור הראשון שלכם!',
+    onb_next: 'הבא', onb_back: 'חזור', onb_go: '!בואו נתחיל', onb_skip: 'דלג על הסיור',
   },
   en: {
     nav_home: 'Home', nav_new_story: 'New Story', nav_my_stories: 'My Stories', nav_credits: 'Credits', nav_admin: 'Admin',
@@ -144,6 +149,11 @@ const translations = {
     contact_success_title: 'Thank you! Message sent 🎉', contact_success_msg: "We've received your message and will get back to you soon.",
     contact_error_required: 'Please fill in all required fields', contact_error_send: 'An error occurred. Please try again.',
     contact_info_email: 'Email', contact_info_phone: 'Phone',
+    onb_welcome_title: 'Welcome to StoryLeap! 🎉', onb_welcome_desc: "We're so glad you joined! Let us show you around in a few simple steps.",
+    onb_create_title: 'Create a Story ✨', onb_create_desc: 'Click "New Story" to create a personalized story for your child. Just fill in the details and the magic happens!',
+    onb_stories_title: 'My Stories 📚', onb_stories_desc: 'All your created stories are saved here. You can re-read, print, or download them anytime.',
+    onb_finish_title: "You're all set! 🚀", onb_finish_desc: "That's it! Now you know everything. Let's create your first story!",
+    onb_next: 'Next', onb_back: 'Back', onb_go: "Let's go!", onb_skip: 'Skip tour',
   }
 };
 

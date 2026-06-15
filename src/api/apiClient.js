@@ -1,8 +1,10 @@
 import { supabase } from './supabaseClient';
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 export async function invokeFunction(name, payload = {}) {
   const { data: { session } } = await supabase.auth.getSession();
-  const res = await fetch(`/api/functions/${name}`, {
+  const res = await fetch(`${API_BASE}/api/functions/${name}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -19,11 +21,14 @@ export async function uploadFile(file) {
   const { data: { session } } = await supabase.auth.getSession();
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch('/api/upload', {
+  const res = await fetch(`${API_BASE}/api/upload`, {
     method: 'POST',
     headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
     body: formData,
   });
-  if (!res.ok) throw new Error('Upload failed');
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Upload failed');
+  }
   return res.json();
 }

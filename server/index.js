@@ -252,6 +252,7 @@ async function capturePaypalOrder({ paypal_order_id, order_id, story_id }, user)
     addStoryToSheet({ data: story }).catch(() => {});
   }
 
+  // Add 20 credits to the buyer after successful story purchase
   try {
     const { data: users } = await supabase.from('users').select('*').eq('email', order.user_email);
     if (users?.[0]) {

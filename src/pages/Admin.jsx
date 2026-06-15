@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download } from 'lucide-react';
+import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download, Shield, ShieldOff } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLanguage } from '../components/LanguageContext';
 
@@ -33,6 +33,7 @@ export default function Admin() {
   const [searchStories, setSearchStories] = useState('');
   const [searchUsers, setSearchUsers] = useState('');
   const [viewingImage, setViewingImage] = useState(null);
+  const [togglingRole, setTogglingRole] = useState(null);
 
   const settingLabels = { space: t('setting_space'), forest: t('setting_forest'), castle: t('setting_castle'), sports: t('setting_sports'), real_life: t('setting_real_life') };
   const challengeLabels = { fears: t('ch_fears'), social_difficulty: t('ch_social'), changes: t('ch_changes'), emotional_regulation: t('ch_emotional'), separation_anxiety: t('ch_separation'), self_confidence: t('ch_confidence'), sleep_issues: t('ch_sleep') };
@@ -106,6 +107,20 @@ export default function Admin() {
       }
     } catch (_) { setSyncLinksMsg('שגיאה בסנכרון לינקים'); }
     finally { setIsSyncingLinks(false); }
+  };
+
+  const handleToggleRole = async (u) => {
+    if (!u.email.endsWith('@storyleapai.com')) {
+      alert('ניתן להעניק הרשאת אדמין רק למשתמשים עם כתובת @storyleapai.com');
+      return;
+    }
+    setTogglingRole(u.id);
+    try {
+      const newRole = u.role === 'admin' ? 'user' : 'admin';
+      await supabase.from('users').update({ role: newRole }).eq('id', u.id);
+      setUsers(users.map(x => x.id === u.id ? { ...x, role: newRole } : x));
+    } catch (err) { alert('שגיאה בעדכון תפקיד: ' + err.message); }
+    finally { setTogglingRole(null); }
   };
 
   const handleSaveCredits = async () => {
@@ -272,6 +287,7 @@ export default function Admin() {
                   <TableHead className="text-right">שם</TableHead>
                   <TableHead className="text-right">אימייל</TableHead>
                   <TableHead className="text-right">קרדיטים</TableHead>
+                  <TableHead className="text-right">תפקיד</TableHead>
                   <TableHead className="text-right">פעולות</TableHead>
                 </TableRow>
               </TableHeader>
@@ -281,7 +297,21 @@ export default function Admin() {
                     <TableCell className="font-medium">{u.full_name || '-'}</TableCell>
                     <TableCell className="text-sm text-gray-500">{u.email}</TableCell>
                     <TableCell><div className="flex items-center gap-1"><Star className="w-4 h-4 text-amber-500 fill-amber-400" /><span className="font-semibold">{u.credits ?? 0}</span></div></TableCell>
-                    <TableCell><Button variant="outline" size="sm" onClick={() => { setEditingUser(u); setCreditsToAdd(''); }}><Star className="w-3 h-3 ml-1" /> ערוך קרדיטים</Button></TableCell>
+                    <TableCell>
+                      <Badge className={u.role === 'admin' ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-600'}>
+                        {u.role === 'admin' ? 'אדמין' : 'משתמש'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setEditingUser(u); setCreditsToAdd(''); }}><Star className="w-3 h-3 ml-1" /> קרדיטים</Button>
+                        {u.email.endsWith('@storyleapai.com') && (
+                          <Button variant="outline" size="sm" onClick={() => handleToggleRole(u)} disabled={togglingRole === u.id} className={u.role === 'admin' ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-violet-200 text-violet-600 hover:bg-violet-50'}>
+                            {togglingRole === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : u.role === 'admin' ? <ShieldOff className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
