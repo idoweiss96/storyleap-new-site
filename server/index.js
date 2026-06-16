@@ -600,6 +600,173 @@ async function retryStory({ story_id }, user) {
   return { success: true, story_id, status: 'paid' };
 }
 
+// ── Therapist functions ───────────────────────────────────────────────────────
+
+async function generateInviteToken(_, user) {
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  const { data: token } = await supabase
+    .from('invite_tokens')
+    .insert({ role: 'therapist', created_by: user.email })
+    .select()
+    .single();
+
+  const appUrl = process.env.VITE_APP_URL || 'https://storyleap-new-site-1.onrender.com';
+  return { token: token.token, url: `${appUrl}/TherapistRegister?token=${token.token}` };
+}
+
+async function registerAsTherapist({ token, full_name, license_number, specialization, clinic_name, phone }, user) {
+  // Validate invite token
+  const { data: inviteToken } = await supabase
+    .from('invite_tokens')
+    .select('*')
+    .eq('token', token)
+    .single();
+
+  if (!inviteToken) throw Object.assign(new Error('קוד הזמנה לא תקין'), { status: 400 });
+  if (inviteToken.used_at) throw Object.assign(new Error('קוד הזמנה כבר נוצל'), { status: 400 });
+  if (new Date(inviteToken.expires_at) < new Date()) throw Object.assign(new Error('קוד הזמנה פג תוקף'), { status: 400 });
+
+  // Check not already registered
+  const { data: existing } = await supabase
+    .from('therapist_profiles')
+    .select('user_email')
+    .eq('user_email', user.email)
+    .single();
+  if (existing) throw Object.assign(new Error('כבר רשום/ה כמטפל/ת'), { status: 400 });
+
+  // Create therapist profile
+  await supabase.from('therapist_profiles').insert({
+    user_email: user.email, full_name, license_number, specialization, clinic_name, phone, status: 'pending',
+  });
+
+  // Mark token as used
+  await supabase.from('invite_tokens').update({ used_at: new Date().toISOString(), used_by_email: user.email }).eq('token', token);
+
+  // Notify admin
+  await resend.emails.send({
+    from: 'StoryLeap AI <stories@storyleapai.com>',
+    to: ADMIN_EMAIL,
+    subject: `🧑‍⚕️ בקשת הרשמה חדשה כמטפל/ת — ${full_name}`,
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <h2>בקשת הרשמה חדשה כמטפל/ת</h2>
+      <p><b>שם:</b> ${full_name}</p>
+      <p><b>מייל:</b> ${user.email}</p>
+      <p><b>מספר רישיון:</b> ${license_number || '—'}</p>
+      <p><b>התמחות:</b> ${specialization || '—'}</p>
+      <p><b>קליניקה:</b> ${clinic_name || '—'}</p>
+      <p><b>טלפון:</b> ${phone || '—'}</p>
+      <p style="margin-top:24px;"><a href="${process.env.VITE_APP_URL || 'https://storyleap-new-site-1.onrender.com'}/Admin" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;">לאישור בפאנל האדמין</a></p>
+    </div>`,
+  });
+
+  return { success: true };
+}
+
+async function approveTherapist({ user_email }, user) {
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  await supabase.from('therapist_profiles').update({ status: 'approved' }).eq('user_email', user_email);
+  await supabase.from('users').update({ role: 'therapist' }).eq('email', user_email);
+
+  const appUrl = process.env.VITE_APP_URL || 'https://storyleap-new-site-1.onrender.com';
+  await resend.emails.send({
+    from: 'StoryLeap AI <stories@storyleapai.com>',
+    to: user_email,
+    subject: 'ברוכים הבאים לStoryLeap — הבקשה שלכם אושרה! 🎉',
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <h2>הבקשה שלכם אושרה! 🎉</h2>
+      <p>שמחים לבשר שהצטרפתם לקהילת המטפלים של StoryLeap.</p>
+      <p>כעת תוכלו להיכנס לדשבורד המטפל ולהתחיל לעבוד עם המטופלים שלכם.</p>
+      <p style="margin-top:24px;"><a href="${appUrl}/TherapistDashboard" style="background:#7c3aed;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;">כניסה לדשבורד</a></p>
+    </div>`,
+  });
+
+  return { success: true };
+}
+
+async function rejectTherapist({ user_email, reason }, user) {
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  await supabase.from('therapist_profiles').update({ status: 'rejected', reject_reason: reason || '' }).eq('user_email', user_email);
+
+  await resend.emails.send({
+    from: 'StoryLeap AI <stories@storyleapai.com>',
+    to: user_email,
+    subject: 'עדכון על בקשת ההרשמה שלכם ל-StoryLeap',
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;">
+      <h2>עדכון על בקשתכם</h2>
+      <p>לאחר בחינת הבקשה, לא נוכל לאשר את הצטרפותכם בשלב זה.</p>
+      ${reason ? `<p><b>סיבה:</b> ${reason}</p>` : ''}
+      <p>לשאלות ניתן לפנות אלינו ב-<a href="mailto:${ADMIN_EMAIL}">${ADMIN_EMAIL}</a></p>
+    </div>`,
+  });
+
+  return { success: true };
+}
+
+async function getTherapistProfile(_, user) {
+  const { data } = await supabase.from('therapist_profiles').select('*').eq('user_email', user.email).single();
+  return { profile: data };
+}
+
+async function getTherapistClients(_, user) {
+  const { data } = await supabase.from('therapist_clients').select('*').eq('therapist_email', user.email).order('created_at', { ascending: false });
+  return { clients: data || [] };
+}
+
+async function addTherapistClient({ parent_email, child_name, child_age, gender, notes }, user) {
+  const { data: profile } = await supabase.from('therapist_profiles').select('status').eq('user_email', user.email).single();
+  if (profile?.status !== 'approved') throw Object.assign(new Error('רק מטפלים מאושרים יכולים להוסיף מטופלים'), { status: 403 });
+
+  const { data } = await supabase.from('therapist_clients').insert({
+    therapist_email: user.email, parent_email, child_name, child_age, gender, notes,
+  }).select().single();
+
+  return { success: true, client: data };
+}
+
+async function sendTherapistMessage({ parent_email, child_name, subject, message }, user) {
+  const { data: profile } = await supabase.from('therapist_profiles').select('*').eq('user_email', user.email).single();
+  if (profile?.status !== 'approved') throw Object.assign(new Error('רק מטפלים מאושרים יכולים לשלוח הודעות'), { status: 403 });
+
+  await supabase.from('therapist_messages').insert({
+    therapist_email: user.email, parent_email, child_name, subject, message,
+  });
+
+  await resend.emails.send({
+    from: 'StoryLeap AI <stories@storyleapai.com>',
+    to: parent_email,
+    subject: `המלצה מהמטפל/ת בנוגע ל${child_name} — ${subject}`,
+    html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1e293b;">
+      <div style="background:linear-gradient(135deg,#7c3aed,#5b21b6);padding:24px 32px;border-radius:12px 12px 0 0;">
+        <h1 style="color:white;margin:0;font-size:20px;">StoryLeap — המלצה מהמטפל/ת</h1>
+      </div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:24px 32px;">
+        <p>שלום,</p>
+        <p>קיבלת המלצה מ<b>${profile.full_name}</b> בנוגע ל<b>${child_name}</b>:</p>
+        <h3 style="color:#7c3aed;">${subject}</h3>
+        <p style="white-space:pre-wrap;line-height:1.8;">${message}</p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+        <p style="font-size:13px;color:#64748b;">הודעה זו נשלחה דרך מערכת StoryLeap</p>
+      </div>
+    </div>`,
+  });
+
+  return { success: true };
+}
+
+async function getPendingTherapists(_, user) {
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  const { data } = await supabase.from('therapist_profiles').select('*').order('created_at', { ascending: false });
+  return { therapists: data || [] };
+}
+
 // ── Function router ───────────────────────────────────────────────────────────
 const FUNCTIONS = {
   submitStoryWithCredits:  { handler: (p, u) => submitStoryWithCredits(p, u),  requiresAuth: true },
@@ -610,6 +777,15 @@ const FUNCTIONS = {
   validateCoupon:          { handler: (p, u) => validateCoupon(p, u),          requiresAuth: true },
   updateStoryStatus:       { handler: (p, u) => updateStoryStatus(p, u),       requiresAuth: true },
   retryStory:              { handler: (p, u) => retryStory(p, u),              requiresAuth: true },
+  generateInviteToken:     { handler: (p, u) => generateInviteToken(p, u),     requiresAuth: true },
+  registerAsTherapist:     { handler: (p, u) => registerAsTherapist(p, u),     requiresAuth: true },
+  approveTherapist:        { handler: (p, u) => approveTherapist(p, u),        requiresAuth: true },
+  rejectTherapist:         { handler: (p, u) => rejectTherapist(p, u),         requiresAuth: true },
+  getTherapistProfile:     { handler: (p, u) => getTherapistProfile(p, u),     requiresAuth: true },
+  getTherapistClients:     { handler: (p, u) => getTherapistClients(p, u),     requiresAuth: true },
+  addTherapistClient:      { handler: (p, u) => addTherapistClient(p, u),      requiresAuth: true },
+  sendTherapistMessage:    { handler: (p, u) => sendTherapistMessage(p, u),    requiresAuth: true },
+  getPendingTherapists:    { handler: (p, u) => getPendingTherapists(p, u),    requiresAuth: true },
   sendFormEmail:           { handler: (p) => sendFormEmail(p),                 requiresAuth: false },
   sendStoryReadyEmail:     { handler: (p) => sendStoryReadyEmail(p),           requiresAuth: false },
   notifyNewStory:          { handler: (p) => notifyNewStory(p),                requiresAuth: false },
