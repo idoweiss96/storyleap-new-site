@@ -823,12 +823,11 @@ app.post('/api/functions/:name', async (req, res) => {
 // ── File upload ───────────────────────────────────────────────────────────────
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    const user = await getUser(req);
-    if (!user) return res.status(401).json({ error: 'Unauthorized' });
     if (!req.file) return res.status(400).json({ error: 'No file provided' });
-
+    const user = await getUser(req);
+    const folder = user ? user.id : `temp/${crypto.randomUUID()}`;
     const ext = req.file.originalname.split('.').pop();
-    const fileName = `${user.id}/${Date.now()}.${ext}`;
+    const fileName = `${folder}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from('story-images').upload(fileName, req.file.buffer, {
       contentType: req.file.mimetype, upsert: true,
     });
