@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Star, BookOpen, Wand2, Heart, ArrowLeft, Dumbbell, ChevronRight, ChevronLeft, Quote } from 'lucide-react';
 import { useLanguage } from '../components/LanguageContext';
+import GiftBanner from '../components/GiftBanner';
 
 function TestimonialsCarousel() {
   const { t } = useLanguage();
@@ -126,6 +127,8 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+      <GiftBanner />
 
       {/* Features Section */}
       <section className="py-12 hidden md:block">
