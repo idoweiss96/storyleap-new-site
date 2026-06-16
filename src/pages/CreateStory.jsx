@@ -85,6 +85,8 @@ export default function CreateStory() {
     setError('');
     if (!validateForm()) return;
     if (!user) { saveAndPromptLogin(); return; }
+    const credits = dbUser?.credits ?? 0;
+    if (credits < 20) { await handleBuyCredits(); return; }
     setStep('credits_check');
   };
 
