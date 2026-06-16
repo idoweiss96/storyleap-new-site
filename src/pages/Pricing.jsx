@@ -67,6 +67,7 @@ export default function Pricing() {
           if (res.data?.success) {
             localStorage.removeItem('pendingStoryId');
             window.dispatchEvent(new Event('credits-updated'));
+            toast.success(isHe ? '🎉 הקרדיטים התווספו לחשבונך!' : '🎉 Credits added to your account!', { duration: 5000 });
             navigate('/PaymentSuccess?story_id=' + pendingStoryId);
           } else { setPaypalError(isHe ? 'שגיאה בעיבוד התשלום, נסו שנית' : 'Payment processing error, please try again'); }
         } else {
@@ -113,13 +114,14 @@ export default function Pricing() {
         const pendingStoryId = localStorage.getItem('pendingStoryId');
         if (pendingStoryId) {
           const res = await invokeFunction('capturePaypalOrder', { paypal_order_id: data.orderID, story_id: pendingStoryId });
-          if (res.data?.success) { localStorage.removeItem('pendingStoryId'); window.dispatchEvent(new Event('credits-updated')); navigate('/PaymentSuccess?story_id=' + pendingStoryId); }
+          if (res.data?.success) { localStorage.removeItem('pendingStoryId'); window.dispatchEvent(new Event('credits-updated')); toast.success(isHe ? '🎉 הקרדיטים התווספו לחשבונך!' : '🎉 Credits added to your account!', { duration: 5000 }); navigate('/PaymentSuccess?story_id=' + pendingStoryId); }
         } else {
           const isHostedButton = !!btnConfig.hostedButtonId;
           const res = await invokeFunction('captureCreditsOrder', { paypal_order_id: data.orderID, credits: 20, coupon: isHostedButton });
           if (res.data?.success) {
             if (user) await supabase.from('users').update({ credits: res.data.new_total }).eq('id', user.id);
             setTimeout(() => window.dispatchEvent(new Event('credits-updated')), 300);
+            toast.success(isHe ? '🎉 הקרדיטים התווספו לחשבונך!' : '🎉 Credits added to your account!', { duration: 5000 });
             navigate('/MyStories?payment=success');
           }
         }
