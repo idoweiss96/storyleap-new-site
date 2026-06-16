@@ -11,11 +11,6 @@ import { useLanguage } from '../components/LanguageContext';
 import { supabase } from '@/api/supabaseClient';
 import { invokeFunction } from '@/api/apiClient';
 
-const VALID_CODES = ['MIL30', 'NYUD30', 'SHNK30', 'MIAMI30', 'MATANA30'];
-const FREE_CREDIT_CODES = { 'STORY20': 20 };
-const HOSTED_BUTTON_CODES = {
-  'IDO10': { hostedButtonId: 'AMAMAC5GTGJUG', currency: 'ILS', display: '₪0.10' },
-};
 const PAYPAL_CLIENT_ID = 'AUlDxKcPJNwHXhUVlvzN8WF2Ug8wpivDo8BuLKDkcbnfqLpJTTtPoWv7IWIbM-Ryq6Hs7dq2TUsvcHma';
 const PRICE_CONFIG = {
   he: {
@@ -45,10 +40,17 @@ export default function Pricing() {
 
   const isHe = lang === 'he';
   const [hostedButtonCode, setHostedButtonCode] = useState(null);
+  const [discountPrices, setDiscountPrices] = useState(null);
   const mode = promoApplied ? 'discount' : 'full';
-  const btnConfig = useMemo(() => (
-    hostedButtonCode ? HOSTED_BUTTON_CODES[hostedButtonCode] : PRICE_CONFIG[isHe ? 'he' : 'en'][mode]
-  ), [hostedButtonCode, isHe, mode]);
+  const btnConfig = useMemo(() => {
+    if (hostedButtonCode) return hostedButtonCode;
+    if (promoApplied && discountPrices) {
+      return isHe
+        ? { amount: String(discountPrices.ils), currency: 'ILS', display: `₪${discountPrices.ils}` }
+        : { amount: String(discountPrices.usd), currency: 'USD', display: `$${discountPrices.usd}` };
+    }
+    return PRICE_CONFIG[isHe ? 'he' : 'en'][mode];
+  }, [hostedButtonCode, isHe, mode, promoApplied, discountPrices]);
 
   // Handle PayPal redirect return on mobile
   useEffect(() => {
@@ -180,24 +182,38 @@ export default function Pricing() {
   const handleApplyPromo = async () => {
     setPromoError('');
     const code = promoCode.trim().toUpperCase();
-    if (FREE_CREDIT_CODES[code] !== undefined) {
-      setPromoLoading(true);
-      try {
-        const credits = FREE_CREDIT_CODES[code];
-        const res = await invokeFunction('captureCreditsOrder', { paypal_order_id: `COUPON_${code}`, credits, coupon: true });
-        if (res.data?.success) {
-          if (user) await supabase.from('users').update({ credits: res.data.new_total }).eq('id', user.id);
+    if (!code) return;
+    setPromoLoading(true);
+    try {
+      const res = await invokeFunction('validateCoupon', { code });
+      const coupon = res.data?.coupon;
+      if (!coupon) { setPromoError(isHe ? 'קוד פרומו לא תקין' : 'Invalid promo code'); return; }
+
+      if (coupon.type === 'free_credits') {
+        const credits = coupon.credits_amount;
+        const captureRes = await invokeFunction('captureCreditsOrder', { paypal_order_id: `COUPON_${code}`, credits, coupon: true, coupon_code: code });
+        if (captureRes.data?.success) {
+          if (user) await supabase.from('users').update({ credits: captureRes.data.new_total }).eq('id', user.id);
           window.dispatchEvent(new Event('credits-updated'));
           toast.success(isHe ? `🎉 ${credits} קרדיטים התווספו לחשבונך!` : `🎉 ${credits} credits added to your account!`, { duration: 5000 });
           setPromoCode('');
         } else { setPromoError(isHe ? 'שגיאה בהפעלת הקוד' : 'Error applying code'); }
-      } catch (_) { setPromoError(isHe ? 'שגיאה בהפעלת הקוד' : 'Error applying code'); }
-      finally { setPromoLoading(false); }
-      return;
-    }
-    if (Object.prototype.hasOwnProperty.call(HOSTED_BUTTON_CODES, code)) { setHostedButtonCode(code); setPromoApplied(true); }
-    else if (VALID_CODES.includes(code)) { setHostedButtonCode(null); setPromoApplied(true); }
-    else { setPromoError(isHe ? 'קוד פרומו לא תקין' : 'Invalid promo code'); }
+      } else if (coupon.type === 'hosted_button') {
+        setHostedButtonCode({ hostedButtonId: coupon.hosted_button_id, currency: coupon.hosted_currency, display: coupon.hosted_display });
+        setPromoApplied(true);
+      } else if (coupon.type === 'discount') {
+        setHostedButtonCode(null);
+        setPromoApplied(true);
+        // Store discount prices for PayPal button
+        setDiscountPrices({ ils: coupon.price_ils, usd: coupon.price_usd });
+      }
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg.includes('already used')) setPromoError(isHe ? 'כבר השתמשת בקוד זה' : 'You have already used this coupon');
+      else if (msg.includes('expired')) setPromoError(isHe ? 'הקוד פג תוקף' : 'Coupon has expired');
+      else if (msg.includes('limit')) setPromoError(isHe ? 'הקוד אזל' : 'Coupon limit reached');
+      else setPromoError(isHe ? 'קוד פרומו לא תקין' : 'Invalid promo code');
+    } finally { setPromoLoading(false); }
   };
 
   return (
@@ -238,7 +254,7 @@ export default function Pricing() {
                     </Button>
                   </div>
                 ) : (
-                  <button className="text-xs text-slate-400 underline" onClick={() => { setPromoApplied(false); setPromoCode(''); setHostedButtonCode(null); }}>{isHe ? 'הסר קוד' : 'Remove code'}</button>
+                  <button className="text-xs text-slate-400 underline" onClick={() => { setPromoApplied(false); setPromoCode(''); setHostedButtonCode(null); setDiscountPrices(null); }}>{isHe ? 'הסר קוד' : 'Remove code'}</button>
                 )}
                 {promoError && <p className="text-red-500 text-xs mt-1">{promoError}</p>}
               </div>

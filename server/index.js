@@ -287,7 +287,67 @@ async function createCreditsOrder({ currency = 'ILS', amount = '45.00', return_u
   return { paypal_order_id: ppData.id, client_id: process.env.PAYPAL_CLIENT_ID };
 }
 
-async function captureCreditsOrder({ paypal_order_id, credits = 20, coupon }, user) {
+async function validateCoupon({ code }, user) {
+  if (!code) throw Object.assign(new Error('Missing coupon code'), { status: 400 });
+  const normalizedCode = code.trim().toUpperCase();
+
+  const { data: coupon, error } = await supabase
+    .from('coupons')
+    .select('*')
+    .eq('code', normalizedCode)
+    .single();
+
+  if (error || !coupon) throw Object.assign(new Error('Invalid coupon code'), { status: 400 });
+  if (!coupon.active) throw Object.assign(new Error('Coupon is no longer active'), { status: 400 });
+  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+    throw Object.assign(new Error('Coupon has expired'), { status: 400 });
+  }
+
+  // Check total usage limit
+  if (coupon.max_uses !== null) {
+    const { count } = await supabase
+      .from('coupon_redemptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('coupon_code', normalizedCode);
+    if (count >= coupon.max_uses) throw Object.assign(new Error('Coupon usage limit reached'), { status: 400 });
+  }
+
+  // Check per-user usage limit
+  if (coupon.max_uses_per_user !== null) {
+    const { count } = await supabase
+      .from('coupon_redemptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('coupon_code', normalizedCode)
+      .eq('user_email', user.email);
+    if (count >= coupon.max_uses_per_user) {
+      throw Object.assign(new Error('You have already used this coupon'), { status: 400 });
+    }
+  }
+
+  return { valid: true, coupon };
+}
+
+async function captureCreditsOrder({ paypal_order_id, credits = 20, coupon, coupon_code }, user) {
+  // If this is a free-credit coupon redemption, validate it server-side
+  if (coupon && coupon_code) {
+    const normalizedCode = coupon_code.trim().toUpperCase();
+    // Re-validate to prevent replay attacks
+    await validateCoupon({ code: normalizedCode }, user);
+
+    const { data: users } = await supabase.from('users').select('*').eq('email', user.email);
+    const currentUser = users?.[0];
+    if (!currentUser) throw new Error('User not found');
+
+    const newCredits = (currentUser.credits || 0) + credits;
+    await supabase.from('users').update({ credits: newCredits }).eq('id', currentUser.id);
+
+    // Record redemption
+    await supabase.from('coupon_redemptions').insert({ coupon_code: normalizedCode, user_email: user.email });
+
+    return { success: true, credits_added: credits, new_total: newCredits };
+  }
+
+  // Standard PayPal payment flow (coupon=true means hosted button, no code needed)
   if (!coupon) {
     const accessToken = await getPaypalAccessToken();
     const orderCheckRes = await fetch(`${PAYPAL_BASE}/v2/checkout/orders/${paypal_order_id}`, {
@@ -497,6 +557,49 @@ async function syncLinksFromSheet(_payload, user) {
   return { success: true, updated };
 }
 
+// ── Admin: story status management ───────────────────────────────────────────
+
+const VALID_STORY_STATUSES = ['pending_payment', 'paid', 'story_generating', 'review', 'story_ready', 'failed'];
+
+async function updateStoryStatus({ story_id, status }, user) {
+  if (!VALID_STORY_STATUSES.includes(status)) {
+    throw Object.assign(new Error(`Invalid status: ${status}`), { status: 400 });
+  }
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  await supabase.from('stories').update({ payment_status: status }).eq('id', story_id);
+
+  // If marking as ready and story has a link + email, send notification
+  if (status === 'story_ready') {
+    const { data: story } = await supabase.from('stories').select('*').eq('id', story_id).single();
+    if (story?.story_link && story?.contact_email) {
+      sendStoryReadyEmail({ to: story.contact_email, childName: story.child_name, storyLink: story.story_link, isHebrew: isHebrewText(story.child_name) }).catch(() => {});
+    }
+  }
+
+  return { success: true, story_id, status };
+}
+
+async function retryStory({ story_id }, user) {
+  const { data: dbUser } = await supabase.from('users').select('role').eq('email', user.email).single();
+  if (dbUser?.role !== 'admin') throw Object.assign(new Error('Admin only'), { status: 403 });
+
+  const { data: story } = await supabase.from('stories').select('*').eq('id', story_id).single();
+  if (!story) throw Object.assign(new Error('Story not found'), { status: 404 });
+  if (story.payment_status !== 'failed') {
+    throw Object.assign(new Error('Only failed stories can be retried'), { status: 400 });
+  }
+
+  // Reset to 'paid' (waiting) so it can be picked up for generation again
+  await supabase.from('stories').update({ payment_status: 'paid' }).eq('id', story_id);
+
+  // Also add back to Google Sheets for manual re-processing
+  addStoryToSheet({ data: story }).catch(() => {});
+
+  return { success: true, story_id, status: 'paid' };
+}
+
 // ── Function router ───────────────────────────────────────────────────────────
 const FUNCTIONS = {
   submitStoryWithCredits:  { handler: (p, u) => submitStoryWithCredits(p, u),  requiresAuth: true },
@@ -504,6 +607,9 @@ const FUNCTIONS = {
   capturePaypalOrder:      { handler: (p, u) => capturePaypalOrder(p, u),      requiresAuth: true },
   createCreditsOrder:      { handler: (p, u) => createCreditsOrder(p, u),      requiresAuth: true },
   captureCreditsOrder:     { handler: (p, u) => captureCreditsOrder(p, u),     requiresAuth: true },
+  validateCoupon:          { handler: (p, u) => validateCoupon(p, u),          requiresAuth: true },
+  updateStoryStatus:       { handler: (p, u) => updateStoryStatus(p, u),       requiresAuth: true },
+  retryStory:              { handler: (p, u) => retryStory(p, u),              requiresAuth: true },
   sendFormEmail:           { handler: (p) => sendFormEmail(p),                 requiresAuth: false },
   sendStoryReadyEmail:     { handler: (p) => sendStoryReadyEmail(p),           requiresAuth: false },
   notifyNewStory:          { handler: (p) => notifyNewStory(p),                requiresAuth: false },

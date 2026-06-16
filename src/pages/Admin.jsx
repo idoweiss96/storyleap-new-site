@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download, Shield, ShieldOff } from 'lucide-react';
+import { FileSpreadsheet, BookOpen, Loader2, ShieldAlert, Pencil, Check, ExternalLink, RefreshCw, Star, Users, Search, Image, Download, Shield, ShieldOff, Tag, Plus, Trash2, ClipboardList, RotateCcw, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLanguage } from '../components/LanguageContext';
 
@@ -34,6 +34,13 @@ export default function Admin() {
   const [searchUsers, setSearchUsers] = useState('');
   const [viewingImage, setViewingImage] = useState(null);
   const [togglingRole, setTogglingRole] = useState(null);
+  const [coupons, setCoupons] = useState([]);
+  const [newCoupon, setNewCoupon] = useState({ code: '', type: 'discount', price_ils: '15', price_usd: '5', credits_amount: '20', max_uses: '', max_uses_per_user: '1', expires_at: '' });
+  const [isSavingCoupon, setIsSavingCoupon] = useState(false);
+  const [couponMsg, setCouponMsg] = useState('');
+  const [ordersTab, setOrdersTab] = useState('all');
+  const [updatingStatus, setUpdatingStatus] = useState(null);
+  const [retryingStory, setRetryingStory] = useState(null);
 
   const settingLabels = { space: t('setting_space'), forest: t('setting_forest'), castle: t('setting_castle'), sports: t('setting_sports'), real_life: t('setting_real_life') };
   const challengeLabels = { fears: t('ch_fears'), social_difficulty: t('ch_social'), changes: t('ch_changes'), emotional_regulation: t('ch_emotional'), separation_anxiety: t('ch_separation'), self_confidence: t('ch_confidence'), sleep_issues: t('ch_sleep') };
@@ -49,12 +56,14 @@ export default function Admin() {
       const { data: userRow } = await supabase.from('users').select('*').eq('id', authUser.id).single();
       if (userRow?.role === 'admin') {
         setIsAdmin(true);
-        const [{ data: allStories }, { data: allUsers }] = await Promise.all([
+        const [{ data: allStories }, { data: allUsers }, { data: allCoupons }] = await Promise.all([
           supabase.from('stories').select('*').order('created_at', { ascending: false }),
           supabase.from('users').select('*').order('created_at', { ascending: false }),
+          supabase.from('coupons').select('*').order('created_at', { ascending: false }),
         ]);
         setStories(allStories || []);
         setUsers(allUsers || []);
+        setCoupons(allCoupons || []);
       }
     } catch (_) {}
     finally { setIsLoading(false); }
@@ -156,6 +165,80 @@ export default function Admin() {
     finally { setIsSaving(false); }
   };
 
+  const STATUS_META = {
+    pending_payment: { label: 'Draft',      color: 'bg-gray-100 text-gray-600' },
+    paid:            { label: 'Waiting',    color: 'bg-blue-100 text-blue-700' },
+    story_generating:{ label: 'Generating', color: 'bg-yellow-100 text-yellow-700' },
+    review:          { label: 'Review',     color: 'bg-violet-100 text-violet-700' },
+    story_ready:     { label: 'Ready',      color: 'bg-green-100 text-green-700' },
+    failed:          { label: 'Failed',     color: 'bg-red-100 text-red-700' },
+  };
+  const STATUS_FLOW = ['pending_payment', 'paid', 'story_generating', 'review', 'story_ready', 'failed'];
+  const ORDERS_TABS = [
+    { key: 'all',              label: 'הכל' },
+    { key: 'paid',             label: 'Waiting' },
+    { key: 'story_generating', label: 'Generating' },
+    { key: 'review',           label: 'Review' },
+    { key: 'story_ready',      label: 'Ready' },
+    { key: 'failed',           label: 'Failed' },
+  ];
+
+  const paidStories = stories.filter(s => s.payment_status !== 'pending_payment');
+  const filteredOrders = ordersTab === 'all' ? paidStories : paidStories.filter(s => s.payment_status === ordersTab);
+
+  const handleUpdateStatus = async (story, newStatus) => {
+    setUpdatingStatus(story.id);
+    try {
+      await invokeFunction('updateStoryStatus', { story_id: story.id, status: newStatus });
+      setStories(stories.map(s => s.id === story.id ? { ...s, payment_status: newStatus } : s));
+    } catch (err) { alert('שגיאה: ' + err.message); }
+    finally { setUpdatingStatus(null); }
+  };
+
+  const handleRetry = async (story) => {
+    setRetryingStory(story.id);
+    try {
+      await invokeFunction('retryStory', { story_id: story.id });
+      setStories(stories.map(s => s.id === story.id ? { ...s, payment_status: 'paid' } : s));
+    } catch (err) { alert('שגיאה: ' + err.message); }
+    finally { setRetryingStory(null); }
+  };
+
+  const handleCreateCoupon = async () => {
+    if (!newCoupon.code.trim()) { setCouponMsg('חסר קוד קופון'); return; }
+    setIsSavingCoupon(true); setCouponMsg('');
+    try {
+      const payload = {
+        code: newCoupon.code.trim().toUpperCase(),
+        type: newCoupon.type,
+        active: true,
+        max_uses: newCoupon.max_uses ? parseInt(newCoupon.max_uses) : null,
+        max_uses_per_user: newCoupon.max_uses_per_user ? parseInt(newCoupon.max_uses_per_user) : null,
+        expires_at: newCoupon.expires_at || null,
+      };
+      if (newCoupon.type === 'discount') { payload.price_ils = parseFloat(newCoupon.price_ils); payload.price_usd = parseFloat(newCoupon.price_usd); }
+      if (newCoupon.type === 'free_credits') { payload.credits_amount = parseInt(newCoupon.credits_amount); }
+      const { error } = await supabase.from('coupons').insert(payload);
+      if (error) { setCouponMsg('שגיאה: ' + error.message); return; }
+      const { data } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+      setCoupons(data || []);
+      setNewCoupon({ code: '', type: 'discount', price_ils: '15', price_usd: '5', credits_amount: '20', max_uses: '', max_uses_per_user: '1', expires_at: '' });
+      setCouponMsg('✓ קופון נוצר בהצלחה');
+    } catch (err) { setCouponMsg('שגיאה: ' + err.message); }
+    finally { setIsSavingCoupon(false); }
+  };
+
+  const handleToggleCoupon = async (coupon) => {
+    await supabase.from('coupons').update({ active: !coupon.active }).eq('code', coupon.code);
+    setCoupons(coupons.map(c => c.code === coupon.code ? { ...c, active: !c.active } : c));
+  };
+
+  const handleDeleteCoupon = async (code) => {
+    if (!confirm(`למחוק קופון ${code}?`)) return;
+    await supabase.from('coupons').delete().eq('code', code);
+    setCoupons(coupons.filter(c => c.code !== code));
+  };
+
   const downloadImage = (url, name) => {
     const link = document.createElement('a');
     link.href = url;
@@ -209,6 +292,111 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Orders Management Panel */}
+      <Card className="border-0 shadow-xl shadow-slate-100 mb-8">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ClipboardList className="w-5 h-5" /> ניהול הזמנות
+            <span className="ml-auto text-sm font-normal text-slate-500">{paidStories.length} הזמנות בסה"כ</span>
+          </CardTitle>
+          {/* Status tabs */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {ORDERS_TABS.map(tab => {
+              const count = tab.key === 'all' ? paidStories.length : paidStories.filter(s => s.payment_status === tab.key).length;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setOrdersTab(tab.key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${ordersTab === tab.key ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                >
+                  {tab.label}
+                  <span className={`text-xs rounded-full px-1.5 py-0.5 ${ordersTab === tab.key ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-500'}`}>{count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {filteredOrders.length === 0 ? (
+            <p className="text-center text-gray-400 py-8">אין הזמנות בסטטוס זה</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">תאריך</TableHead>
+                    <TableHead className="text-right">שם ילד/ה</TableHead>
+                    <TableHead className="text-right">אימייל</TableHead>
+                    <TableHead className="text-right">סטטוס</TableHead>
+                    <TableHead className="text-right">לינק סיפור</TableHead>
+                    <TableHead className="text-right">פעולות</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map(story => {
+                    const meta = STATUS_META[story.payment_status] || STATUS_META['pending_payment'];
+                    const isUpdating = updatingStatus === story.id;
+                    const isRetrying = retryingStory === story.id;
+                    return (
+                      <TableRow key={story.id}>
+                        <TableCell className="text-sm text-slate-500 whitespace-nowrap">
+                          {story.created_at ? format(new Date(story.created_at), 'dd/MM/yy HH:mm') : '-'}
+                        </TableCell>
+                        <TableCell className="font-medium">{story.child_name}</TableCell>
+                        <TableCell className="text-sm text-slate-500">{story.contact_email || '-'}</TableCell>
+                        <TableCell>
+                          <Badge className={meta.color}>{meta.label}</Badge>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {story.story_link
+                            ? <a href={story.story_link} target="_blank" rel="noopener noreferrer" className="text-violet-600 hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3" />פתח</a>
+                            : <span className="text-slate-300">—</span>}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {/* Status transition buttons */}
+                            {story.payment_status === 'paid' && (
+                              <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'story_generating')} className="text-xs h-7 border-yellow-300 text-yellow-700 hover:bg-yellow-50">
+                                {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : '→ Generating'}
+                              </Button>
+                            )}
+                            {story.payment_status === 'story_generating' && (
+                              <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'review')} className="text-xs h-7 border-violet-300 text-violet-700 hover:bg-violet-50">
+                                {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : '→ Review'}
+                              </Button>
+                            )}
+                            {story.payment_status === 'review' && (
+                              <Button size="sm" variant="outline" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'story_ready')} className="text-xs h-7 border-green-300 text-green-700 hover:bg-green-50">
+                                {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : '→ Ready ✓'}
+                              </Button>
+                            )}
+                            {story.payment_status === 'failed' && (
+                              <Button size="sm" variant="outline" disabled={isRetrying} onClick={() => handleRetry(story)} className="text-xs h-7 border-blue-300 text-blue-700 hover:bg-blue-50">
+                                {isRetrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <><RotateCcw className="w-3 h-3 ml-1" />Retry</>}
+                              </Button>
+                            )}
+                            {/* Mark as failed */}
+                            {['paid', 'story_generating', 'review'].includes(story.payment_status) && (
+                              <Button size="sm" variant="ghost" disabled={isUpdating} onClick={() => handleUpdateStatus(story, 'failed')} className="text-xs h-7 text-red-400 hover:text-red-600 hover:bg-red-50">
+                                Failed
+                              </Button>
+                            )}
+                            {/* Edit link */}
+                            <Button variant="ghost" size="sm" onClick={() => { setEditingStory(story); setStoryLink(story.story_link || ''); }} className="h-7 w-7 p-0">
+                              <Pencil className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="border-0 shadow-xl shadow-slate-100 mb-8">
         <CardHeader>
@@ -317,6 +505,91 @@ export default function Admin() {
               </TableBody>
             </Table>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Coupons Management */}
+      <Card className="border-0 shadow-xl shadow-slate-100 mt-8">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2"><Tag className="w-5 h-5" /> ניהול קופונים</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Create new coupon */}
+          <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-slate-700">יצירת קופון חדש</p>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div>
+                <Label className="text-xs">קוד</Label>
+                <Input value={newCoupon.code} onChange={e => setNewCoupon(p => ({ ...p, code: e.target.value.toUpperCase() }))} placeholder="SUMMER25" className="mt-1 uppercase" dir="ltr" />
+              </div>
+              <div>
+                <Label className="text-xs">סוג</Label>
+                <select value={newCoupon.type} onChange={e => setNewCoupon(p => ({ ...p, type: e.target.value }))} className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="discount">הנחה (discount)</option>
+                  <option value="free_credits">קרדיטים חינם</option>
+                </select>
+              </div>
+              {newCoupon.type === 'discount' && <>
+                <div><Label className="text-xs">מחיר ILS ₪</Label><Input type="number" value={newCoupon.price_ils} onChange={e => setNewCoupon(p => ({ ...p, price_ils: e.target.value }))} className="mt-1" dir="ltr" /></div>
+                <div><Label className="text-xs">מחיר USD $</Label><Input type="number" value={newCoupon.price_usd} onChange={e => setNewCoupon(p => ({ ...p, price_usd: e.target.value }))} className="mt-1" dir="ltr" /></div>
+              </>}
+              {newCoupon.type === 'free_credits' && (
+                <div><Label className="text-xs">מספר קרדיטים</Label><Input type="number" value={newCoupon.credits_amount} onChange={e => setNewCoupon(p => ({ ...p, credits_amount: e.target.value }))} className="mt-1" dir="ltr" /></div>
+              )}
+              <div><Label className="text-xs">מקסימום שימושים (ריק = ללא הגבלה)</Label><Input type="number" value={newCoupon.max_uses} onChange={e => setNewCoupon(p => ({ ...p, max_uses: e.target.value }))} placeholder="ללא הגבלה" className="mt-1" dir="ltr" /></div>
+              <div><Label className="text-xs">מקסימום למשתמש</Label><Input type="number" value={newCoupon.max_uses_per_user} onChange={e => setNewCoupon(p => ({ ...p, max_uses_per_user: e.target.value }))} className="mt-1" dir="ltr" /></div>
+              <div><Label className="text-xs">תאריך תפוגה (אופציונלי)</Label><Input type="date" value={newCoupon.expires_at} onChange={e => setNewCoupon(p => ({ ...p, expires_at: e.target.value }))} className="mt-1" dir="ltr" /></div>
+            </div>
+            <Button onClick={handleCreateCoupon} disabled={isSavingCoupon} className="bg-violet-600 hover:bg-violet-700 text-white">
+              {isSavingCoupon ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : <Plus className="w-4 h-4 ml-2" />}צור קופון
+            </Button>
+            {couponMsg && <p className={`text-sm ${couponMsg.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{couponMsg}</p>}
+          </div>
+
+          {/* Coupons list */}
+          {coupons.length > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">קוד</TableHead>
+                    <TableHead className="text-right">סוג</TableHead>
+                    <TableHead className="text-right">פרטים</TableHead>
+                    <TableHead className="text-right">הגבלות</TableHead>
+                    <TableHead className="text-right">תפוגה</TableHead>
+                    <TableHead className="text-right">סטטוס</TableHead>
+                    <TableHead className="text-right">פעולות</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coupons.map(c => (
+                    <TableRow key={c.code}>
+                      <TableCell className="font-mono font-bold text-slate-800">{c.code}</TableCell>
+                      <TableCell>{c.type === 'discount' ? 'הנחה' : c.type === 'free_credits' ? 'קרדיטים חינם' : 'Hosted Button'}</TableCell>
+                      <TableCell className="text-sm text-slate-600">
+                        {c.type === 'discount' && `₪${c.price_ils} / $${c.price_usd}`}
+                        {c.type === 'free_credits' && `${c.credits_amount} ⭐`}
+                        {c.type === 'hosted_button' && c.hosted_display}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-500">
+                        {c.max_uses ? `עד ${c.max_uses} שימושים` : 'ללא הגבלה'} / {c.max_uses_per_user ? `${c.max_uses_per_user} למשתמש` : 'ללא הגבלה'}
+                      </TableCell>
+                      <TableCell className="text-sm">{c.expires_at ? format(new Date(c.expires_at), 'dd/MM/yyyy') : '—'}</TableCell>
+                      <TableCell>
+                        <Badge className={c.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}>{c.active ? 'פעיל' : 'כבוי'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleToggleCoupon(c)}>{c.active ? 'כבה' : 'הפעל'}</Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCoupon(c.code)} className="text-red-500 hover:text-red-700 hover:bg-red-50"><Trash2 className="w-4 h-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
