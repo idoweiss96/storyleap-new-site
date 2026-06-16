@@ -3,6 +3,8 @@ dotenv.config({ path: '.env.local' });
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { google } from 'googleapis';
@@ -841,5 +843,13 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
+
+// ── Serve React frontend (production) ─────────────────────────────────────────
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(distPath));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(distPath, 'index.html'));
+});
 
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
