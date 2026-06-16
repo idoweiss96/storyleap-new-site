@@ -3,6 +3,7 @@ import { supabase } from '@/api/supabaseClient';
 import { invokeFunction } from '@/api/apiClient';
 import { useNavigate } from 'react-router-dom';
 import { createPageUrl } from '../utils';
+import toast, { Toaster } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -86,7 +87,10 @@ export default function CreateStory() {
     if (!validateForm()) return;
     if (!user) { saveAndPromptLogin(); return; }
     const credits = dbUser?.credits ?? 0;
-    if (credits < 20) { await handleBuyCredits(); return; }
+    if (credits < 20) {
+      toast.error(isHe ? `חסרים קרדיטים — יש לך ${credits} מתוך 20 הנדרשים. מעביר אותך לרכישה...` : `Not enough credits — you have ${credits} of 20 required. Redirecting to purchase...`, { duration: 4000 });
+      await handleBuyCredits(); return;
+    }
     setStep('credits_check');
   };
 
@@ -139,6 +143,7 @@ export default function CreateStory() {
 
   return (
     <div className="max-w-2xl mx-auto pb-12">
+      <Toaster position="top-center" />
       <div className="text-center mb-8">
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 mb-4">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center shadow-lg shadow-slate-200">
