@@ -140,7 +140,6 @@ export default function StoryForm({ formData, setFormData, onSubmit, isLoading, 
 
   const nextStep = () => {
     if (!validateStep()) return;
-    if (step === 1 && !user && onNeedAuth) { onNeedAuth(); return; }
     setStep(s => s + 1);
     window.scrollTo(0, 0);
   };
