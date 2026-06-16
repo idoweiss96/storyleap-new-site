@@ -42,6 +42,12 @@ export default function Admin() {
   const [ordersTab, setOrdersTab] = useState('all');
   const [updatingStatus, setUpdatingStatus] = useState(null);
   const [retryingStory, setRetryingStory] = useState(null);
+  const [therapists, setTherapists] = useState([]);
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+  const [therapistActionLoading, setTherapistActionLoading] = useState(null);
+  const [rejectDialog, setRejectDialog] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   const settingLabels = { space: t('setting_space'), forest: t('setting_forest'), castle: t('setting_castle'), sports: t('setting_sports'), real_life: t('setting_real_life') };
   const challengeLabels = { fears: t('ch_fears'), social_difficulty: t('ch_social'), changes: t('ch_changes'), emotional_regulation: t('ch_emotional'), separation_anxiety: t('ch_separation'), self_confidence: t('ch_confidence'), sleep_issues: t('ch_sleep') };
@@ -57,14 +63,16 @@ export default function Admin() {
       const { data: userRow } = await supabase.from('users').select('*').eq('id', authUser.id).single();
       if (userRow?.role === 'admin') {
         setIsAdmin(true);
-        const [{ data: allStories }, { data: allUsers }, { data: allCoupons }] = await Promise.all([
+        const [{ data: allStories }, { data: allUsers }, { data: allCoupons }, therapistsRes] = await Promise.all([
           supabase.from('stories').select('*').order('created_at', { ascending: false }),
           supabase.from('users').select('*').order('created_at', { ascending: false }),
           supabase.from('coupons').select('*').order('created_at', { ascending: false }),
+          invokeFunction('getPendingTherapists', {}),
         ]);
         setStories(allStories || []);
         setUsers(allUsers || []);
         setCoupons(allCoupons || []);
+        setTherapists(therapistsRes.data?.therapists || []);
       }
     } catch (_) {}
     finally { setIsLoading(false); }
@@ -203,6 +211,35 @@ export default function Admin() {
       setStories(stories.map(s => s.id === story.id ? { ...s, payment_status: 'paid' } : s));
     } catch (err) { alert('שגיאה: ' + err.message); }
     finally { setRetryingStory(null); }
+  };
+
+  const handleGenerateInvite = async () => {
+    setGeneratingInvite(true);
+    try {
+      const res = await invokeFunction('generateInviteToken', {});
+      setInviteUrl(res.data.url);
+    } catch (err) { alert('שגיאה: ' + err.message); }
+    finally { setGeneratingInvite(false); }
+  };
+
+  const handleApproveTherapist = async (email) => {
+    setTherapistActionLoading(email);
+    try {
+      await invokeFunction('approveTherapist', { user_email: email });
+      setTherapists(therapists.map(t => t.user_email === email ? { ...t, status: 'approved' } : t));
+    } catch (err) { alert('שגיאה: ' + err.message); }
+    finally { setTherapistActionLoading(null); }
+  };
+
+  const handleRejectTherapist = async () => {
+    if (!rejectDialog) return;
+    setTherapistActionLoading(rejectDialog.user_email);
+    try {
+      await invokeFunction('rejectTherapist', { user_email: rejectDialog.user_email, reason: rejectReason });
+      setTherapists(therapists.map(t => t.user_email === rejectDialog.user_email ? { ...t, status: 'rejected', reject_reason: rejectReason } : t));
+      setRejectDialog(null); setRejectReason('');
+    } catch (err) { alert('שגיאה: ' + err.message); }
+    finally { setTherapistActionLoading(null); }
   };
 
   const handleCreateCoupon = async () => {
@@ -508,6 +545,101 @@ export default function Admin() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Therapist Management */}
+      <Card className="border-0 shadow-xl shadow-slate-100 mt-8">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Shield className="w-5 h-5 text-violet-600" /> ניהול מטפלים
+            {therapists.filter(t => t.status === 'pending').length > 0 && (
+              <Badge className="bg-red-100 text-red-700 mr-2">{therapists.filter(t => t.status === 'pending').length} ממתינים</Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Generate invite link */}
+          <div className="bg-violet-50 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-semibold text-violet-700">יצירת לינק הזמנה למטפל/ת</p>
+            <div className="flex gap-2">
+              <Button onClick={handleGenerateInvite} disabled={generatingInvite} className="bg-violet-600 hover:bg-violet-700 text-white shrink-0">
+                {generatingInvite ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Plus className="w-4 h-4 ml-1" />}צור לינק
+              </Button>
+              {inviteUrl && (
+                <div className="flex-1 flex gap-2 items-center">
+                  <Input value={inviteUrl} readOnly dir="ltr" className="text-xs bg-white" />
+                  <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(inviteUrl); alert('הועתק!'); }}>העתק</Button>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-violet-500">הלינק תקף ל-30 יום ולשימוש חד-פעמי</p>
+          </div>
+
+          {/* Therapists list */}
+          {therapists.length > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">שם</TableHead>
+                    <TableHead className="text-right">מייל</TableHead>
+                    <TableHead className="text-right">התמחות</TableHead>
+                    <TableHead className="text-right">קליניקה</TableHead>
+                    <TableHead className="text-right">סטטוס</TableHead>
+                    <TableHead className="text-right">פעולות</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {therapists.map(t => (
+                    <TableRow key={t.user_email}>
+                      <TableCell className="font-medium">{t.full_name}</TableCell>
+                      <TableCell className="text-sm text-slate-500">{t.user_email}</TableCell>
+                      <TableCell className="text-sm">{t.specialization || '—'}</TableCell>
+                      <TableCell className="text-sm">{t.clinic_name || '—'}</TableCell>
+                      <TableCell>
+                        <Badge className={
+                          t.status === 'approved' ? 'bg-green-100 text-green-700' :
+                          t.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          'bg-amber-100 text-amber-700'
+                        }>
+                          {t.status === 'approved' ? 'מאושר/ת' : t.status === 'rejected' ? 'נדחה/תה' : 'ממתין/ה'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {t.status === 'pending' && (
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" disabled={therapistActionLoading === t.user_email} onClick={() => handleApproveTherapist(t.user_email)} className="h-7 text-xs border-green-300 text-green-700 hover:bg-green-50">
+                              {therapistActionLoading === t.user_email ? <Loader2 className="w-3 h-3 animate-spin" /> : '✓ אשר'}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => { setRejectDialog(t); setRejectReason(''); }} className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50">דחה</Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          {therapists.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">אין מטפלים רשומים עדיין</p>}
+        </CardContent>
+      </Card>
+
+      {/* Reject therapist dialog */}
+      <Dialog open={!!rejectDialog} onOpenChange={() => setRejectDialog(null)}>
+        <DialogContent className="max-w-sm" dir="rtl">
+          <DialogHeader><DialogTitle>דחיית בקשת {rejectDialog?.full_name}</DialogTitle></DialogHeader>
+          <div className="py-3 space-y-3">
+            <Label>סיבת הדחייה (אופציונלי — תשלח למטפל/ת)</Label>
+            <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="למשל: נדרש מידע נוסף על הרישיון..." className="min-h-20" />
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRejectDialog(null)}>ביטול</Button>
+            <Button onClick={handleRejectTherapist} disabled={!!therapistActionLoading} className="bg-red-500 hover:bg-red-600 text-white">
+              {therapistActionLoading ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}אישור דחייה
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Coupons Management */}
       <Card className="border-0 shadow-xl shadow-slate-100 mt-8">
