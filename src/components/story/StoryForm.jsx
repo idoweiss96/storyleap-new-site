@@ -73,7 +73,7 @@ function CardOption({ value, label, emoji, selected, onClick }) {
   );
 }
 
-export default function StoryForm({ formData, setFormData, onSubmit, isLoading }) {
+export default function StoryForm({ formData, setFormData, onSubmit, isLoading, user, onNeedAuth }) {
   const { t, lang } = useLanguage();
   const isHe = lang === 'he';
   const [step, setStep] = useState(1);
@@ -138,7 +138,12 @@ export default function StoryForm({ formData, setFormData, onSubmit, isLoading }
     return true;
   };
 
-  const nextStep = () => { if (validateStep()) { setStep(s => s + 1); window.scrollTo(0, 0); } };
+  const nextStep = () => {
+    if (!validateStep()) return;
+    if (step === 1 && !user && onNeedAuth) { onNeedAuth(); return; }
+    setStep(s => s + 1);
+    window.scrollTo(0, 0);
+  };
   const prevStep = () => { setStepError(''); setStep(s => s - 1); window.scrollTo(0, 0); };
 
   const stepTitles = [

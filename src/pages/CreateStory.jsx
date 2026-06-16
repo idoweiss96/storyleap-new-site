@@ -75,15 +75,16 @@ export default function CreateStory() {
     created_by: user?.email,
   });
 
+  const saveAndPromptLogin = () => {
+    sessionStorage.setItem(PENDING_FORM_KEY, JSON.stringify(formData));
+    setShowLoginModal(true);
+  };
+
   const handleFormSubmit = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setError('');
     if (!validateForm()) return;
-    if (!user) {
-      sessionStorage.setItem(PENDING_FORM_KEY, JSON.stringify(formData));
-      setShowLoginModal(true);
-      return;
-    }
+    if (!user) { saveAndPromptLogin(); return; }
     setStep('credits_check');
   };
 
@@ -208,7 +209,7 @@ export default function CreateStory() {
             <Card className="border-0 shadow-xl shadow-slate-100">
               <CardContent className="p-6 md:p-8">
                 {error && <Alert className="mb-6 border-red-200 bg-red-50"><AlertCircle className="w-4 h-4 text-red-600" /><AlertDescription className="text-red-800">{error}</AlertDescription></Alert>}
-                <StoryForm formData={formData} setFormData={setFormData} onSubmit={handleFormSubmit} isLoading={false} />
+                <StoryForm formData={formData} setFormData={setFormData} onSubmit={handleFormSubmit} isLoading={false} user={user} onNeedAuth={saveAndPromptLogin} />
               </CardContent>
             </Card>
           </motion.div>
