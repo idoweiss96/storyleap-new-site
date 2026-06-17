@@ -8,22 +8,22 @@ export default function GiftBanner() {
   return (
     <div
       dir="rtl"
-      style={{ background: '#4A3FB5', borderRadius: 16 }}
-      className="flex items-center justify-between gap-4 px-6 py-5 my-8 shadow-lg"
+      style={{ background: '#EDE8FC', borderRadius: 16 }}
+      className="flex items-center justify-between gap-4 px-6 py-5 my-8 shadow-sm"
     >
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: '#4A3FB5' }}>
           <Gift className="w-6 h-6 text-white" />
         </div>
         <div>
-          <span className="inline-block text-xs font-bold text-yellow-300 uppercase tracking-wide mb-1">
+          <span className="inline-block text-xs font-bold uppercase tracking-wide mb-1" style={{ color: '#4A3FB5' }}>
             מתנה מושלמת לילדים
           </span>
-          <h3 className="text-white font-bold text-lg leading-tight">
+          <h3 className="font-bold text-lg leading-tight" style={{ color: '#1E1B4B' }}>
             הפתיעו ילד שאתם אוהבים בסיפור מיוחד
           </h3>
-          <p className="text-white/70 text-sm mt-0.5">
-            כרטיס מתנה דיגיטלי — שולחים בקליק
+          <p className="text-sm mt-0.5" style={{ color: '#6B63A8' }}>
+            כרטיס מתנה דיגיטלי - שולחים בקליק
           </p>
         </div>
       </div>
