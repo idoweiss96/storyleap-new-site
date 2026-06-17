@@ -8,7 +8,7 @@ export default function GiftBanner() {
   return (
     <div
       dir="rtl"
-      style={{ background: '#EDE8FC', borderRadius: 16 }}
+      style={{ background: '#F0E8FF', borderRadius: 16 }}
       className="flex items-center justify-between gap-4 px-6 py-5 my-8 shadow-sm"
     >
       <div className="flex items-center gap-4">
